@@ -4,7 +4,7 @@
 Sms2Mqtt script called by smsd(smstools) when a sms is send or received
 
 Usage:
-    sms2mqtt action filename [messageid]
+    sms2mqtt <action> <filename> [<messageid>]
 """
 
 import logging
@@ -19,22 +19,22 @@ logger = None
 
 def mqttpublish( number , content ) :
     address = 'localhost'
-	port = 1883 , 
-	id = 'sms2mqtt'
-	
-    client = mqttw.Client( client_id = id )
-	client.connect( address , port)
-    
-    topic = 'sms/incoming'
-	qos = 0
-	retain = False
+    port = 1883 
+    id = 'sms2mqtt'
 
-	payload = {'number' : number , 'content' : content }
-	payloadjson = json.dumps( payload )
+    client = mqttw.Client( client_id = id )
+    client.connect( address , port)
+
+    topic = 'sms/incoming'
+    qos = 0
+    retain = False
+
+    payload = {'number' : number , 'content' : content }
+    payloadjson = json.dumps( payload )
 
     client.publish( topic  , payloadjson , qos , retain )
 
-def createLogger() :
+def createlogger() :
     logger = logging.getLogger()
     logger.setLevel( logging.INFO )
     logFile = logging.handlers.RotatingFileHandler( "/var/log/sms2mqtt.log" , mode = "a", maxBytes = 1024*1024 , backupCount = 5  )
@@ -52,32 +52,52 @@ def createLogger() :
 
 def dispatch( action , filename ):
     logger.info( 'action:{} filename:{}'.format( action , filename ) ) 
-    
     dispatch = {}
     dispatch[ 'SENT' ] = sent
     dispatch[ 'RECEIVED' ] = received  
     dispatch[ 'FAILED' ] = None
     dispatch[ 'REPORT' ] = None
     dispatch[ 'CALL' ] = None
+    
+    dispatch[action]( filename )
 
 def received( filename ) :
-    with open( filen , 'rb' ) as f :
-        content = f.read() 
-    logger.info( 'received number:{} content:{}'.format( number , content ) ) 
+    with open( filename , 'r' ) as f :
+        lines = [ line.strip() for line in f ] 
+    
+    sms = {}
+    for line in lines :
+        try :
+            key , value = line.split( ':' , 1 )
+            value = value.strip()
+            sms[ key ] = value
+        except :
+            sms[ 'Content' ] = line 
+    
+    print sms
 
+    number = sms['From']
+    content = sms['Content']
+    
     mqttpublish( number , content )   
+
+def sent( filename ) :
+    with open( filename , 'r' ) as f :
+        content = f.read() 
+    
 
 if __name__ == '__main__' :
     try :
         createlogger()
+        arguments = docopt ( __doc__ )
         logger = logging.getLogger( __name__ )
-		arguments = docopt ( __doc__  )
-        action = arguments['action']
-        filename = arguments['filename']
+        arguments = docopt ( __doc__ )
+        action = arguments['<action>']
+        filename = arguments['<filename>']
         dispatch( action , filename )  
 
-    except Exception as e:
+    except Exception as e :
         logger.error( e , exc_info = True ) 
-		sys.exit( 1 )
+        sys.exit( 1 )
    
     sys.exit( 0 )

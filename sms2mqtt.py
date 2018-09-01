@@ -49,19 +49,29 @@ def createlogger() :
     logConsole.setFormatter(formatter)
     logger.addHandler( logConsole )
 
-
-def dispatch( action , filename ):
-    logger.info( 'action:{} filename:{}'.format( action , filename ) ) 
+def dispatch(action, filename):
+    logger.info( 'action:{} filename:{}'.format(action, filename)) 
     dispatch = {}
     dispatch[ 'SENT' ] = sent
     dispatch[ 'RECEIVED' ] = received  
     dispatch[ 'FAILED' ] = None
     dispatch[ 'REPORT' ] = None
     dispatch[ 'CALL' ] = None
-    
-    dispatch[action]( filename )
+     
+     try:
+        dispatch[action]( filename )ss
+    except Exception as e:
+        logger.exception('dispatch failed for action:{}'.format(ation))
+
 
 def received( filename ) :
+
+    try:
+        with open( 'phonenumbers.json') as f :
+           phonenumbers = json.load(f.read())
+    except IOError:
+            phonenumbers = []
+        
     with open( filename , 'r' ) as f :
         lines = [ line.strip() for line in f ] 
     
@@ -74,17 +84,19 @@ def received( filename ) :
         except :
             sms[ 'Content' ] = line 
     
-    print sms
-
-    number = sms['From']
+    logger.info(str(sms))
+    fromnumber = sms['From']
     content = sms['Content']
     
-    mqttpublish( number , content )   
+    for phonenumber in phonenumbers :
+         logger.info( '{} {}'.format(phonenumber, fromnumber))
+         if fromnumber[0:len(phonenumber)] == fromnumber :
+            mqttpublish(number , content)   
 
-def sent( filename ) :
+
+def sent(filename) :
     with open( filename , 'r' ) as f :
-        content = f.read() 
-    
+        content = f.read()     
 
 if __name__ == '__main__' :
     try :
@@ -92,7 +104,7 @@ if __name__ == '__main__' :
         arguments = docopt ( __doc__ )
         logger = logging.getLogger( __name__ )
         arguments = docopt ( __doc__ )
-        action = arguments['<action>']
+        action = arguments['<actions>']
         filename = arguments['<filename>']
         dispatch( action , filename )  
 
